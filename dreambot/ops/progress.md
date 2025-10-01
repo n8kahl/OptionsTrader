@@ -12,19 +12,30 @@
 - Redis Streams backbone online: ingest publishes synthetic Quote/Agg/OptionMeta batches, features consume & emit Feature packets, signals generate intents downstream.
 - Risk service now consumes SignalIntent stream, applies guardrails, and emits OrderRequest messages; OMS consumes risk-approved orders and records placements to Redis.
 - Acceptance pytest suite (12 tests) green, including stream pipeline coverage alongside feature parity, gating rules, OMS lifecycle, option universe caps, econ halts, and calibration I/O.
+- (2025-10-01) Polygon ingest now streams equities/indices/options with dynamic option-universe rotation, config toggles per cluster, and targeted pytest coverage remains green.
+- (2025-10-01) Execution analytics service now derives slippage/latency/risk-reward metrics from OMS fills and publishes `dreambot:execution_reports` for downstream consumers.
+- (2025-10-02) Polygon ingest now pulls live websockets + snapshot rotation with delta/DTE filters, redis stream auditing via `STREAM_AUDIT_PATH`, and coverage expanded with audit/universe tests.
+- (2025-10-02) Polygon service now records websocket traffic to rotated JSONL snapshots, emits `dreambot:ingest_heartbeat` lag metrics, and ships replay helpers with pytest coverage.
+- (2025-10-02) OMS integrates Tradier advanced OTOCO routing (sandbox/live), configurable credentials, resilient client retries, and payload conformance tests.
+- (2025-10-02) Tradier OMS now polls sandbox order status, reacts to risk-driven cancel/modify commands on `dreambot:risk_commands`, and risk service schedules time-stop cancels and partial-fill stop tightenings.
+- (2025-10-02) OMS status events now stream `dreambot:oms_metrics` latency/fill telemetry and persist JSONL audits (`OMS_AUDIT_PATH`) for compliance replay.
+- (2025-10-02) Backtest runner now loads CSV/ synthetic bars, replays signals, and emits JSON summaries with expectancy/win-rate for rapid strategy validation.
+- (2025-10-02) Calibration CLI aggregates backtest trades, writes `backtests/calibration.json` (risk multiplier & pot threshold), and learner streams now apply these offsets to live adjustments.
+- (2025-10-02) Polygon flat-file sync tool fetches recent aggregates via temporary S3 credentials (`services/backtest/polygon_sync.py`) for nightly calibration ingest.
+- (2025-10-02) Nightly orchestration script (`ops/nightly_calibration.py`) pulls flat files and regenerates `backtests/calibration.json` in one step.
 
 ## Near-Term Roadmap
-1. **Wire Real Data & Messaging**
-   - Replace synthetic generator with live Polygon websocket + REST handlers feeding the existing Redis Streams.
-   - Extend consumption chain to risk/OMS/learner services and persist audit trails of stream payloads.
-2. **Tradier & Polygon Integration**
-   - Replace in-memory broker with authenticated Tradier client (requires aiohttp + sandbox/live routing config).
-   - Implement Polygon websocket/REST handlers with resilience, heartbeats, reconnection, and option chain filtering by delta/DTE.
+1. **Live Data Hardening**
+   - Surface ingest heartbeat metrics in dashboard/alerts; derive lag thresholds and alerting.
+   - Build snapshot replay CLI + golden-path integration test using captured feeds.
+2. **Tradier OMS Enhancements**
+   - Backfill OMS dashboard panes with live status/latency metrics and partial-fill analytics.
+   - Automate archival/rotation policies for OMS audits in ops runbook.
 3. **Risk & OMS Enhancements**
    - Track live PnL/exposure from executions; enforce kill switch & force-flat in OMS.
    - Implement stop sync updates reacting to underlying ticks; ensure OTOCO leg modifications/alerts.
 4. **Learner & Calibration Loop**
-   - Implement nightly backtest jobs reading DuckDB flat files, generating calibration JSON (PoT offsets, spread z thresholds).
+   - Connect backtest outputs to nightly DuckDB jobs, generating calibration JSON (PoT offsets, spread z thresholds).
    - Train contextual bandit/meta-label classifier; persist weights and integrate with signal sizing.
 5. **Backtest Fidelity**
    - Flesh out fill model using spread state/event rate; produce `summary.csv`, `fill_quality.csv`, `calibration.json` from runs.

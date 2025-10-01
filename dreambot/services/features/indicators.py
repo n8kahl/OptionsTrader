@@ -125,8 +125,10 @@ def compute_adx(high: Sequence[float], low: Sequence[float], close: Sequence[flo
     plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
     minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
     trs = compute_true_range(high_arr[1:], low_arr[1:], close_arr[1:])
-    plus_di = 100 * wilder_smoothing(plus_dm, period) / wilder_smoothing(trs, period)
-    minus_di = 100 * wilder_smoothing(minus_dm, period) / wilder_smoothing(trs, period)
+    trs_smoothed = wilder_smoothing(trs, period)
+    denom = np.where(np.abs(trs_smoothed) < 1e-9, 1e-9, trs_smoothed)
+    plus_di = 100 * wilder_smoothing(plus_dm, period) / denom
+    minus_di = 100 * wilder_smoothing(minus_dm, period) / denom
     dx = 100 * np.abs(plus_di - minus_di) / np.maximum(plus_di + minus_di, 1e-9)
     adx = wilder_smoothing(dx, period)
     return float(adx[-1])
