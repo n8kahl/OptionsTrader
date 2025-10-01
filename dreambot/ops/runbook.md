@@ -7,7 +7,7 @@
 `docker compose down`
 
 ## Watch Logs
-`docker compose logs -f oms` *(replace `oms` with any service name)*
+`docker compose logs -f oms` *(replace `oms` with any service name, e.g., `redis` for stream health)*
 
 ## Common Incidents
 - Feed stale → system enters defensive mode automatically. Investigate network and confirm feeds resume.

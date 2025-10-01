@@ -9,12 +9,14 @@
 - Risk manager enforces daily loss cap, position limits, econ halts, force-flat windows; OMS builds OTOCO payloads with in-memory broker.
 - Backtest runner reuses live feature code, deterministic RNG, placeholder fill model, and metrics snapshot.
 - Streamlit dashboard stub renders status/heatmap panels for health visualization.
-- Acceptance pytest suite (11 tests) green, covering feature parity vs. backtest, gating rules, OMS lifecycle, option universe caps, econ halts, kill switch, calibration I/O.
+- Redis Streams backbone online: ingest publishes synthetic Quote/Agg/OptionMeta batches, features consume & emit Feature packets, signals generate intents downstream.
+- Risk service now consumes SignalIntent stream, applies guardrails, and emits OrderRequest messages; OMS consumes risk-approved orders and records placements to Redis.
+- Acceptance pytest suite (12 tests) green, including stream pipeline coverage alongside feature parity, gating rules, OMS lifecycle, option universe caps, econ halts, and calibration I/O.
 
 ## Near-Term Roadmap
 1. **Wire Real Data & Messaging**
-   - Connect ingest outputs to Redis Streams or chosen message bus; emit Quote/Agg/OptionMeta payloads.
-   - Plumb features/signals/risk/OMS/learner services to subscribe & publish via the shared contracts.
+   - Replace synthetic generator with live Polygon websocket + REST handlers feeding the existing Redis Streams.
+   - Extend consumption chain to risk/OMS/learner services and persist audit trails of stream payloads.
 2. **Tradier & Polygon Integration**
    - Replace in-memory broker with authenticated Tradier client (requires aiohttp + sandbox/live routing config).
    - Implement Polygon websocket/REST handlers with resilience, heartbeats, reconnection, and option chain filtering by delta/DTE.

@@ -10,7 +10,11 @@ from typing import Any, Deque, Dict, Mapping, Optional
 
 import numpy as np
 import yaml
+from redis.asyncio import Redis
 
+from ..common.redis import close_redis, consume_stream, create_redis, publish_json
+from ..common.streams import AGG_STREAM, FEATURE_STREAM, OPTION_META_STREAM, QUOTE_STREAM
+from ..ingest.schemas import Agg1s, OptionMeta, Quote
 from .indicators import (
     compute_adx,
     compute_atr,
@@ -24,7 +28,6 @@ from .microstructure import SpreadHistory, classify_spread, compute_spread_pct, 
 from .probability import probability_itm, probability_of_touch
 from .schemas import FeaturePacket
 from .vol_surface import TermStructure, compute_smile_skew, compute_term_structure, realized_vol_gap, vol_of_vol
-from ..ingest.schemas import Agg1s, OptionMeta, Quote
 
 
 @dataclass
@@ -183,12 +186,50 @@ def load_feature_config() -> Mapping[str, Any]:
     return yaml.safe_load(Path("config/features.yaml").read_text(encoding="utf-8"))
 
 
+async def run_feature_stream(engine: FeatureEngine, redis: Redis, *, stop_event: asyncio.Event | None = None) -> None:
+    """Consume ingest streams, compute features, and publish downstream packets."""
+
+    def should_stop() -> bool:
+        return stop_event.is_set() if stop_event else False
+
+    def handle_quote(payload: Dict[str, Any]) -> None:
+        engine.update_quote(Quote.from_dict(payload))
+
+    def handle_option(payload: Dict[str, Any]) -> None:
+        engine.update_option(OptionMeta.from_dict(payload))
+
+    async def handle_agg(payload: Dict[str, Any]) -> None:
+        bar = Agg1s.from_dict(payload)
+        packet = engine.compute_features(bar.symbol, bar)
+        await publish_json(redis, FEATURE_STREAM, packet.to_dict())
+
+    tasks = [
+        asyncio.create_task(
+            consume_stream(redis, QUOTE_STREAM, handle_quote, stop=should_stop)
+        ),
+        asyncio.create_task(
+            consume_stream(redis, OPTION_META_STREAM, handle_option, stop=should_stop)
+        ),
+        asyncio.create_task(
+            consume_stream(redis, AGG_STREAM, handle_agg, stop=should_stop)
+        ),
+    ]
+    try:
+        await asyncio.gather(*tasks)
+    except asyncio.CancelledError:
+        for task in tasks:
+            task.cancel()
+        raise
+
+
 async def main_async() -> None:
     config = load_feature_config()
     engine = FeatureEngine(config)
-    # Placeholder event loop to keep container alive while integration wiring is added.
-    while True:
-        await asyncio.sleep(5)
+    redis = await create_redis()
+    try:
+        await run_feature_stream(engine, redis)
+    finally:
+        await close_redis(redis)
 
 
 def main() -> None:

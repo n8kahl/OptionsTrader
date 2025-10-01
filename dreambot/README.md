@@ -6,7 +6,7 @@ DreamBot is a multi-service options scalping stack targeting SPX, NDX, SPY, and 
 
 1. Duplicate `.env.example` to `.env` and populate Polygon and Tradier credentials.
 2. Ensure Docker and Docker Compose are installed.
-3. Launch the stack with `docker compose up -d` from the `dreambot` directory.
+3. Launch the stack with `docker compose up -d` from the `dreambot` directory (Redis is bundled for inter-service messaging).
 4. Open the Streamlit dashboard at `http://localhost:8501`.
 
 ## Services

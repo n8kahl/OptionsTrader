@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional
+from typing import Mapping, Optional
 
 import yaml
+from redis.asyncio import Redis
 
+from ..common.redis import close_redis, consume_stream, create_redis, publish_json
+from ..common.streams import OMS_ORDER_STREAM, RISK_ORDER_STREAM
 from .order_templates import build_otoco
+from .schemas import OrderRequest, OrderStatus
 from .stop_sync import StopSyncConfig, adjust_stop
 from .tradier_api import InMemoryBroker, TradierClient, TradierConfig
 
@@ -32,21 +35,20 @@ class OMSService:
         self.broker = broker or InMemoryBroker()
         self.stop_config = StopSyncConfig(modify_on_tick=config.modify_stop_on_underlying)
 
-    async def route_signal(self, signal: Mapping[str, Any], option_symbol: str,
-                           option_price: float, target_price: float, stop_price: float, quantity: int) -> Mapping[str, Any]:
+    async def route_order(self, request: OrderRequest) -> OrderStatus:
         if not self.config.use_otoco:
             raise NotImplementedError("DreamBot only routes OTOCO orders per spec")
         order = build_otoco(
-            symbol=option_symbol,
-            quantity=quantity,
-            side=signal["side"],
-            entry_price=option_price,
-            target_price=target_price,
-            stop_price=stop_price,
+            symbol=request.option_symbol,
+            quantity=request.quantity,
+            side=request.side,
+            entry_price=request.entry_price,
+            target_price=request.target_price,
+            stop_price=request.stop_price,
             offset_ticks=self.config.default_limit_offset_ticks,
         )
         response = await self.broker.place_order(order.to_payload())
-        return response
+        return OrderStatus(order_id=response["id"], state=response.get("status", "unknown"), payload=response)
 
     def sync_stop(self, existing_stop: float, underlying_price: float, direction: str) -> float:
         return adjust_stop(existing_stop, underlying_price, direction, self.stop_config)
@@ -57,12 +59,34 @@ def build_tradier_client(env: Mapping[str, str]) -> TradierClient:
     return TradierClient(cfg)
 
 
+async def run_oms_stream(service: OMSService, redis: Redis, *, stop_event: asyncio.Event | None = None) -> None:
+    def should_stop() -> bool:
+        return stop_event.is_set() if stop_event else False
+
+    async def handle_order(payload: Mapping[str, object]) -> None:
+        request = OrderRequest.from_dict(dict(payload))
+        status = await service.route_order(request)
+        await publish_json(redis, OMS_ORDER_STREAM, status.to_dict())
+
+    task = asyncio.create_task(
+        consume_stream(redis, RISK_ORDER_STREAM, handle_order, stop=should_stop)
+    )
+    try:
+        await task
+    except asyncio.CancelledError:
+        task.cancel()
+        raise
+
+
 async def main_async() -> None:
     config_map = load_broker_config()
     config = OMSConfig(**config_map)
     service = OMSService(config)
-    while True:
-        await asyncio.sleep(5)
+    redis = await create_redis()
+    try:
+        await run_oms_stream(service, redis)
+    finally:
+        await close_redis(redis)
 
 
 def main() -> None:

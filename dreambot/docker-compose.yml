@@ -1,6 +1,13 @@
 version: "3.9"
 
 services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   ingest:
     image: python:3.11-slim
     working_dir: /app
@@ -11,7 +18,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/ingest/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
     healthcheck:
       test: ["CMD", "bash", "ops/healthcheck.sh", "ingest"]
       interval: 30s
@@ -28,8 +40,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/features/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       ingest:
         condition: service_healthy
     healthcheck:
@@ -48,8 +64,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/signals/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       features:
         condition: service_healthy
     healthcheck:
@@ -68,8 +88,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/risk/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       signals:
         condition: service_healthy
     healthcheck:
@@ -88,8 +112,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/oms/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       risk:
         condition: service_healthy
     healthcheck:
@@ -108,8 +136,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/learner/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       oms:
         condition: service_healthy
     healthcheck:
@@ -128,8 +160,12 @@ services:
       - ./data:/app/data
     command: ["python", "services/backtest/main.py"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_started
       learner:
         condition: service_healthy
     healthcheck:
@@ -148,10 +184,14 @@ services:
       - ./data:/app/data
     command: ["streamlit", "run", "services/dashboard/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
     env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
     restart: unless-stopped
     ports:
       - "8501:8501"
     depends_on:
+      redis:
+        condition: service_started
       learner:
         condition: service_healthy
     healthcheck:
