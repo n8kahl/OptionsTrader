@@ -22,6 +22,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0, help="Random seed for replay determinism")
     parser.add_argument("--sync-method", choices=["s3", "rest", "none"], default="rest", help="Data sync strategy")
     parser.add_argument("--adjusted", action="store_true", help="Use adjusted prices when syncing via REST")
+    parser.add_argument("--no-optimize", action="store_true", help="Disable parameter optimization")
+    parser.add_argument("--pot-grid", default="", help="Comma-separated pot thresholds")
+    parser.add_argument("--adx-grid", default="", help="Comma-separated ADX thresholds")
+    parser.add_argument("--min-win-rate", type=float, default=0.25, help="Minimum acceptable win rate")
+    parser.add_argument("--min-trades", type=int, default=200, help="Minimum trades required per symbol")
+    parser.add_argument(
+        "--decision-map",
+        default="I:SPX=SPY,I:NDX=QQQ",
+        help="Optional mapping target=source (e.g., I:SPX=SPY)",
+    )
     return parser.parse_args()
 
 
@@ -61,12 +71,34 @@ def main() -> None:
     else:
         print("Skipping data sync (sync method set to none)")
 
+    def _parse_float_list(text: str, default: list[float]) -> list[float]:
+        if not text:
+            return default
+        return [float(item.strip()) for item in text.split(",") if item.strip()]
+
+    def _parse_decision_map(raw: str) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        if not raw:
+            return mapping
+        for pair in raw.split(","):
+            if "=" not in pair:
+                continue
+            target, source = pair.split("=", 1)
+            mapping[target.strip().upper()] = source.strip().upper()
+        return mapping
+
     summary, trades = calibrate(
         args.symbols,
         data=str(dest_dir),
         table=None,
         limit=args.limit,
         seed=args.seed,
+        optimize=not args.no_optimize,
+        pot_grid=_parse_float_list(args.pot_grid, [0.52, 0.55, 0.58, 0.6, 0.62]),
+        adx_grid=_parse_float_list(args.adx_grid, [12, 15, 18, 20, 25]),
+        min_win_rate=args.min_win_rate,
+        min_trades=args.min_trades,
+        decision_map=_parse_decision_map(args.decision_map),
     )
 
     output_path = Path(args.calibration_output)

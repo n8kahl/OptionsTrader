@@ -23,6 +23,9 @@
 - (2025-10-02) Calibration CLI aggregates backtest trades, writes `backtests/calibration.json` (risk multiplier & pot threshold), and learner streams now apply these offsets to live adjustments.
 - (2025-10-02) Polygon flat-file sync tool fetches recent aggregates via temporary S3 credentials (`services/backtest/polygon_sync.py`) for nightly calibration ingest.
 - (2025-10-02) Nightly orchestration script (`ops/nightly_calibration.py`) pulls flat files and regenerates `backtests/calibration.json` in one step.
+- (2025-10-02) Tradier sandbox smoke-test script (`scripts/test_tradier_sandbox.py`) places/cancels an OTOCO for pre-market verification.
+- (2025-10-02) Calibration optimizer runs per-symbol grid search (pot/ADX), writes symbol-specific parameters, and learner/signal pipeline now apply per-symbol risk & gating overrides.
+- (2025-10-02) Portfolio service streams real-time PnL/positions and dashboard displays recent signals, OMS orders, and PnL metrics.
 
 ## Near-Term Roadmap
 1. **Live Data Hardening**

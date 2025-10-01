@@ -40,39 +40,60 @@ class BacktestRunner:
         self.risk_manager = build_risk_manager(config.risk)
         self.oms = OMSService(OMSConfig(**config.oms))
 
-    def replay(self, symbol: str, bars: Sequence[Agg1s]) -> BacktestResult:
+    def replay(
+        self,
+        symbol: str,
+        bars: Sequence[Agg1s],
+        *,
+        decision_symbol: str | None = None,
+        decision_bars: Sequence[Agg1s] | None = None,
+    ) -> BacktestResult:
         if not bars:
+            return BacktestResult(features=[], trades=[], report=summarize([]))
+
+        decision_symbol = decision_symbol or symbol
+        src_bars = decision_bars or bars
+        length = min(len(bars), len(src_bars))
+        if length == 0:
             return BacktestResult(features=[], trades=[], report=summarize([]))
 
         self.risk_manager.set_session_start(bars[0].ts)
         features: List[FeaturePacket] = []
         trades: List[Trade] = []
-        for idx, bar in enumerate(bars):
+        for idx in range(length):
+            feature_bar = src_bars[idx]
+            actual_bar = bars[idx]
             quote = Quote(
-                ts=bar.ts,
-                symbol=symbol,
-                bid=bar.c - 0.05,
-                ask=bar.c + 0.05,
-                mid=bar.c,
-                bid_size=max(bar.v / 10, 1.0),
-                ask_size=max(bar.v / 10, 1.0),
+                ts=feature_bar.ts,
+                symbol=decision_symbol,
+                bid=feature_bar.c - 0.05,
+                ask=feature_bar.c + 0.05,
+                mid=feature_bar.c,
+                bid_size=max(feature_bar.v / 10, 1.0),
+                ask_size=max(feature_bar.v / 10, 1.0),
                 nbbo_age_ms=10,
             )
             self.feature_engine.update_quote(quote)
-            feature = self.feature_engine.compute_features(symbol, bar)
+            feature = self.feature_engine.compute_features(decision_symbol, feature_bar)
             features.append(feature)
-            if idx == len(bars) - 1:
+            if idx == length - 1:
                 continue
-            if not self.risk_manager.entry_allowed(bar.ts, minutes_to_open=60, minutes_to_close=240):
+            if not self.risk_manager.entry_allowed(feature_bar.ts, minutes_to_open=60, minutes_to_close=240):
                 continue
             try:
                 gate_adjustments = {"risk_multiplier": 1.0}
-                signal = self.signal_engine.evaluate(bar.ts, symbol, feature, feature.atr_1m, gate_adjustments)
+                signal = self.signal_engine.evaluate(
+                    feature_bar.ts,
+                    decision_symbol,
+                    feature,
+                    feature.atr_1m,
+                    gate_adjustments,
+                )
             except RuntimeError:
                 continue
-            spread = max(bar.h - bar.l, 0.02)
+            spread = max(actual_bar.h - actual_bar.l, 0.02)
             fill_inputs = FillInputs(
-                mid=bar.c,
+                mid=actual_bar.c,
                 spread=spread,
                 spread_state=feature.micro["spread_state"],
                 event_rate=10,
@@ -86,7 +107,7 @@ class BacktestRunner:
             pnl *= size_multiplier
             trades.append(
                 Trade(
-                    entry_ts=bar.ts,
+                    entry_ts=actual_bar.ts,
                     exit_ts=exit_bar.ts,
                     symbol=symbol,
                     side=signal["side"],
@@ -100,5 +121,6 @@ class BacktestRunner:
             self.risk_manager.register_position(+1)
             self.risk_manager.register_position(-1)
             self.risk_manager.register_fill(pnl, exit_bar.ts)
+
         report = summarize(trades)
         return BacktestResult(features=features, trades=trades, report=report)

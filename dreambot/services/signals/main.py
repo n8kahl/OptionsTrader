@@ -10,7 +10,7 @@ import yaml
 from redis.asyncio import Redis
 
 from ..common.redis import close_redis, consume_stream, create_redis, publish_json
-from ..common.streams import FEATURE_STREAM, SIGNAL_STREAM
+from ..common.streams import FEATURE_STREAM, SIGNAL_STREAM, LEARNER_ADJUSTMENT_STREAM
 from ..features.schemas import FeaturePacket
 from .gating import evaluate_gates
 from .policy import build_signal
@@ -40,7 +40,14 @@ class SignalEngine:
         atr: float,
         learner_adjustments: Mapping[str, float],
     ) -> Mapping[str, Any]:
-        gate = evaluate_gates(features, self.gate_config)
+        config = dict(self.gate_config)
+        pot_override = learner_adjustments.get("pot_threshold")
+        if pot_override is not None:
+            config["pot_threshold"] = float(pot_override)
+        adx_override = learner_adjustments.get("adx_threshold")
+        if adx_override is not None:
+            config["adx_threshold"] = float(adx_override)
+        gate = evaluate_gates(features, config)
         if not gate.allowed:
             raise RuntimeError("Gating prevented entry")
         return build_signal(ts, underlying, features, gate, learner_adjustments, atr)
@@ -77,32 +84,48 @@ async def run_signal_stream(
     learner_adjustments: Mapping[str, float] | None = None,
     stop_event: asyncio.Event | None = None,
 ) -> None:
-    adjustments = learner_adjustments or {}
+    default_adjustments = dict(learner_adjustments or {})
+    symbol_adjustments: Dict[str, Dict[str, Any]] = {}
 
     def should_stop() -> bool:
         return stop_event.is_set() if stop_event else False
 
     async def handle_feature(payload: Dict[str, Any]) -> None:
         packet = _feature_from_payload(payload)
+        sym_key = packet.symbol.upper()
+        params = dict(default_adjustments)
+        if sym_key in symbol_adjustments:
+            params.update(symbol_adjustments[sym_key])
+        params.pop("symbol", None)
         try:
             signal = engine.evaluate(
                 packet.ts,
                 packet.symbol,
                 packet,
                 packet.atr_1m,
-                adjustments,
+                params,
             )
         except RuntimeError:
             return
         await publish_json(redis, SIGNAL_STREAM, signal)
 
-    task = asyncio.create_task(
-        consume_stream(redis, FEATURE_STREAM, handle_feature, stop=should_stop)
-    )
+    async def handle_adjustment(payload: Dict[str, Any]) -> None:
+        symbol = str(payload.get("symbol", "")).upper()
+        data = dict(payload)
+        if symbol:
+            symbol_adjustments[symbol] = data
+        else:
+            default_adjustments.update(data)
+
+    tasks = [
+        asyncio.create_task(consume_stream(redis, FEATURE_STREAM, handle_feature, stop=should_stop)),
+        asyncio.create_task(consume_stream(redis, LEARNER_ADJUSTMENT_STREAM, handle_adjustment, stop=should_stop)),
+    ]
     try:
-        await task
+        await asyncio.gather(*tasks)
     except asyncio.CancelledError:
-        task.cancel()
+        for task in tasks:
+            task.cancel()
         raise
 
 

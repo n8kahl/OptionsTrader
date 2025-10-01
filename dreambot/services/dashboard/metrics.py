@@ -60,6 +60,14 @@ class OMSMetric:
         }
 
 
+def parse_portfolio(payload: Mapping[str, object]) -> Mapping[str, object]:
+    return {
+        "realized_pnl": float(payload.get("realized_pnl", 0.0)),
+        "unrealized_pnl": float(payload.get("unrealized_pnl", 0.0)),
+        "total_pnl": float(payload.get("total_pnl", 0.0)),
+        "positions": list(payload.get("positions", [])),
+    }
+
 def parse_heartbeat(payload: Mapping[str, object]) -> HeartbeatSnapshot:
     mode = str(payload.get("mode", "synthetic"))
     quotes = payload.get("quotes", {}) if isinstance(payload.get("quotes"), Mapping) else {}

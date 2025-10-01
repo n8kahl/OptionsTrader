@@ -44,6 +44,8 @@ Generate calibration offsets for the learner with
 python -m services.backtest.calibrate --symbols SPY QQQ \
   --data data/backtests/spy_1m.duckdb \
   --table bars_intraday \
+  --optimize \
+  --decision-map I:SPX=SPY,I:NDX=QQQ \
   --output backtests/calibration.json
 ```
 
@@ -79,6 +81,31 @@ python -m ops.nightly_calibration \
 ```
 
 This orchestrates the sync + calibration in one shot and emits refreshed learner offsets for the next trading session.
+
+### Tradier Sandbox Verification
+
+```bash
+export TRADIER_SANDBOX_TOKEN=your_token
+export TRADIER_SANDBOX_ACCOUNT=your_account
+python scripts/test_tradier_sandbox.py \
+  --option SPY241018C00450000 \
+  --side BUY \
+  --quantity 1 \
+  --entry 0.05 --target 0.15 --stop 0.02
+```
+
+The script submits an OTOCO in the sandbox, polls the order status, and sends a cancel. You should see the transition `accepted → open → cancelled` in the console.
+
+### Dashboard & Portfolio
+
+Run the portfolio service alongside Streamlit to surface real-time PnL and positions:
+
+```bash
+python -m services.portfolio.main
+streamlit run dreambot/services/dashboard/app.py
+```
+
+The dashboard now shows ingest heartbeat/OMS metrics, recent signals & OMS orders, and the current PnL snapshot from Redis (`dreambot:portfolio`).
 
 ## Storage Layout
 
