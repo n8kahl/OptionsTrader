@@ -1,0 +1,5 @@
+paper: true
+order_type: marketable_limit
+use_otoco: true
+default_limit_offset_ticks: 1
+modify_stop_on_underlying: true

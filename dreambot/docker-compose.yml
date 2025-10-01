@@ -1,0 +1,161 @@
+version: "3.9"
+
+services:
+  ingest:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/ingest/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "ingest"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  features:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/features/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      ingest:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "features"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  signals:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/signals/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      features:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "signals"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  risk:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/risk/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      signals:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "risk"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  oms:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/oms/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      risk:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "oms"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  learner:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/learner/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      oms:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "learner"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backtest:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["python", "services/backtest/main.py"]
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+      learner:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "backtest"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  dashboard:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["streamlit", "run", "services/dashboard/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    depends_on:
+      learner:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "dashboard"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

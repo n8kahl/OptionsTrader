@@ -1,0 +1,6 @@
+active_symbols: [SPY, QQQ, SPX, NDX]
+dte_range: [0, 3]          # inclusive
+delta_range: [0.30, 0.55]
+strikes_around_atm: 5
+rotate_option_list_every_secs: 60
+late_close_flatten_seconds_before: 30   # for 4:15 pm names

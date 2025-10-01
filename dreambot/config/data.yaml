@@ -1,0 +1,12 @@
+polygon:
+  stocks_ws: true
+  indices_ws: true
+  options_ws: true
+  option_chain_snapshot_secs: 30
+  max_contracts_per_conn: 1000
+  symbols:
+    stocks: [SPY, QQQ]
+    indices: [I:SPX, I:NDX]
+universe_policy:
+  refresh_secs: 60
+  rank_by: [volume, oi, spread_quality]

@@ -1,0 +1,22 @@
+vwap:
+  bands_sigmas: [1, 2, 3]
+  band_stdev_window_secs: 600           # rolling stdev window for bands
+atr:
+  fast_secs: 10
+  min_lookback: 14
+adx:
+  tf_minutes: 3
+probabilities:
+  compute_nd2: true
+  use_pot_rule_of_thumb: true           # PoT ≈ 2 × P(ITM) for OTM
+microstructure:
+  nbbo_stale_ms: 800
+  nbbo_max_spread_pct: 1.0
+  spread_stress_z: 1.25                 # >1.25× time-bucket median = stressed
+  cvd_lookback_secs: 90
+  es_nq_lead_confirm_secs: 10
+vol_surface:
+  term_days: [9, 30, 60]
+  skew_delta: 0.25
+  vol_of_vol_window_mins: 60
+  rv_windows_mins: [5, 15]
