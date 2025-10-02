@@ -16,7 +16,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/ingest/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.ingest.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -38,7 +38,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/features/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.features.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -62,7 +62,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/signals/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.signals.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -86,7 +86,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/risk/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.risk.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -110,7 +110,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/oms/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.oms.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -126,7 +126,7 @@ services:
       timeout: 5s
       retries: 3
 
-  learner:
+  execution:
     image: python:3.11-slim
     working_dir: /app
     volumes:
@@ -134,7 +134,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/learner/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.execution.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -143,6 +143,32 @@ services:
       redis:
         condition: service_started
       oms:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "ops/healthcheck.sh", "execution"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  learner:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ./config:/app/config
+      - ./storage:/app/storage
+      - ./data:/app/data
+    command: ["bash", "-lc", "pip install -e . && python -m services.learner.main"]
+    env_file: .env
+    environment:
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      oms:
+        condition: service_healthy
+      execution:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "bash", "ops/healthcheck.sh", "learner"]
@@ -158,7 +184,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["python", "services/backtest/main.py"]
+    command: ["bash", "-lc", "pip install -e . && python -m services.backtest.main"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
@@ -182,7 +208,7 @@ services:
       - ./config:/app/config
       - ./storage:/app/storage
       - ./data:/app/data
-    command: ["streamlit", "run", "services/dashboard/app.py", "--server.port", "8501", "--server.address", "0.0.0.0"]
+    command: ["bash", "-lc", "pip install -e . && streamlit run services/dashboard/app.py --server.port 8501 --server.address 0.0.0.0"]
     env_file: .env
     environment:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}

@@ -1,5 +1,17 @@
+provider: tradier
 paper: true
 order_type: marketable_limit
 use_otoco: true
 default_limit_offset_ticks: 1
 modify_stop_on_underlying: true
+tradier:
+  access_token_env: TRADIER_ACCESS_TOKEN
+  account_id_env: TRADIER_ACCOUNT_ID
+  duration: day
+  max_retries: 5
+  retry_backoff_secs: 1.0
+  request_timeout_secs: 5.0
+  poll_interval_secs: 1.0
+  status_timeout_secs: 60.0
+  paper_base_url: https://sandbox.tradier.com/v1
+  live_base_url: https://api.tradier.com/v1

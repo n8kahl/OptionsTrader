@@ -7,6 +7,7 @@ from fakeredis import aioredis as fakeredis
 from services.common.redis import publish_json
 from services.common.streams import (
     AGG_STREAM,
+    EXECUTION_STREAM,
     OMS_ORDER_STREAM,
     OPTION_META_STREAM,
     QUOTE_STREAM,
@@ -15,6 +16,7 @@ from services.common.streams import (
 )
 from services.features.main import FeatureEngine, load_feature_config, run_feature_stream
 from services.ingest.schemas import Agg1s, OptionMeta, Quote
+from services.execution.main import ExecutionAnalyticsService, run_execution_stream
 from services.signals.main import SignalEngine, run_signal_stream
 from services.risk.main import (
     RiskService,
@@ -74,6 +76,12 @@ async def test_stream_pipeline_emits_signal(feature_config):
     oms_stop = asyncio.Event()
     oms_task = asyncio.create_task(run_oms_stream(oms_service, redis, stop_event=oms_stop))
 
+    execution_service = ExecutionAnalyticsService()
+    execution_stop = asyncio.Event()
+    execution_task = asyncio.create_task(
+        run_execution_stream(execution_service, redis, stop_event=execution_stop)
+    )
+
     try:
         ts = 1700000000000000
         quote = Quote(
@@ -117,12 +125,16 @@ async def test_stream_pipeline_emits_signal(feature_config):
 
         oms_entries = await redis.xread({OMS_ORDER_STREAM: "0-0"}, count=1, block=1000)
         assert oms_entries, "oms stream remained empty"
+
+        execution_entries = await redis.xread({EXECUTION_STREAM: "0-0"}, count=1, block=1000)
+        assert execution_entries, "execution stream remained empty"
     finally:
         feature_stop.set()
         signal_stop.set()
         risk_stop.set()
         oms_stop.set()
-        for task in (feature_task, signal_task, risk_task, oms_task):
+        execution_stop.set()
+        for task in (feature_task, signal_task, risk_task, oms_task, execution_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task

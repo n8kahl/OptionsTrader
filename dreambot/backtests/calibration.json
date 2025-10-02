@@ -1,1 +1,99 @@
-{}
+{
+  "generated_at": "2025-10-01T23:17:00.996968+00:00",
+  "symbols": {
+    "SPY": {
+      "metrics": {
+        "trades": 303,
+        "expectancy": -0.043369389438948525,
+        "win_rate": 0.24422442244224424,
+        "avg_win": 0.03812060810810718,
+        "avg_loss": -0.06970240174673072,
+        "pnl": -13.140925000001403
+      },
+      "playbooks": {
+        "ORB": {
+          "trades": 303,
+          "wins": 74,
+          "losses": 229,
+          "pnl": -13.140925000001403,
+          "avg_win": 0.03812060810810718,
+          "avg_loss": -0.06970240174673072
+        }
+      },
+      "params": {
+        "pot_threshold": 0.52,
+        "adx_threshold": 12,
+        "risk_multiplier": 0.9566,
+        "decision_symbol": "SPY"
+      }
+    },
+    "QQQ": {
+      "metrics": {
+        "trades": 421,
+        "expectancy": -0.06098212544380293,
+        "win_rate": 0.2660332541567696,
+        "avg_win": 0.05566997918842807,
+        "avg_loss": -0.10326379443671513,
+        "pnl": -25.673474811841032
+      },
+      "playbooks": {
+        "ORB": {
+          "trades": 224,
+          "wins": 64,
+          "losses": 160,
+          "pnl": -8.520275000000936,
+          "avg_win": 0.030626562500001953,
+          "avg_loss": -0.06550234375000663
+        },
+        "TREND_PULLBACK": {
+          "trades": 197,
+          "wins": 48,
+          "losses": 149,
+          "pnl": -17.153199811840096,
+          "avg_win": 0.0890612014396629,
+          "avg_loss": -0.1438130032278115
+        }
+      },
+      "params": {
+        "pot_threshold": 0.52,
+        "adx_threshold": 12,
+        "risk_multiplier": 0.939,
+        "decision_symbol": "QQQ"
+      }
+    }
+  },
+  "global": {
+    "trades": 724,
+    "expectancy": -0.05361104946387077,
+    "win_rate": 0.2569060773480663,
+    "avg_win": 0.048687971339268145,
+    "avg_loss": -0.08897836892369203,
+    "pnl": -38.814399811842435
+  },
+  "playbooks": {
+    "ORB": {
+      "trades": 527,
+      "wins": 138,
+      "losses": 389,
+      "pnl": -21.66120000000234,
+      "avg_win": 0.034645108695652585,
+      "avg_loss": -0.06797487146530179
+    },
+    "TREND_PULLBACK": {
+      "trades": 197,
+      "wins": 48,
+      "losses": 149,
+      "pnl": -17.153199811840096,
+      "avg_win": 0.0890612014396629,
+      "avg_loss": -0.1438130032278115
+    }
+  },
+  "global_params": {
+    "pot_threshold": 0.52,
+    "adx_threshold": 12,
+    "risk_multiplier": 0.9464
+  },
+  "risk_multiplier": 0.9464,
+  "pot_threshold": 0.52,
+  "adx_threshold": 12
+}

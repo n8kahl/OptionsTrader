@@ -7,6 +7,8 @@ from typing import Any, Awaitable, Callable, Dict, Mapping
 
 from redis.asyncio import Redis
 
+from .audit import get_auditor
+
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 
 
@@ -27,7 +29,11 @@ async def close_redis(client: Redis) -> None:
 async def publish_json(client: Redis, stream: str, payload: Mapping[str, Any], *, maxlen: int = 1_000) -> str:
     """Publish a JSON payload to a Redis Stream."""
     data = json.dumps(payload, separators=(",", ":"))
-    return await client.xadd(stream, {"data": data}, maxlen=maxlen, approximate=True)
+    entry_id = await client.xadd(stream, {"data": data}, maxlen=maxlen, approximate=True)
+    auditor = get_auditor()
+    if auditor is not None:
+        await auditor.write(stream, payload)
+    return entry_id
 
 
 async def consume_stream(

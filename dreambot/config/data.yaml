@@ -4,6 +4,9 @@ polygon:
   options_ws: true
   option_chain_snapshot_secs: 30
   max_contracts_per_conn: 1000
+  heartbeat_secs: 5
+  snapshot_path: storage/logs/snapshots
+  snapshot_rotate_mb: 50
   symbols:
     stocks: [SPY, QQQ]
     indices: [I:SPX, I:NDX]

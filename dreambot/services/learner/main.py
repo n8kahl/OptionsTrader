@@ -13,6 +13,7 @@ from ..common.redis import close_redis, consume_stream, create_redis, publish_js
 from ..common.streams import (
     FEATURE_STREAM,
     LEARNER_ADJUSTMENT_STREAM,
+    EXECUTION_STREAM,
     OMS_ORDER_STREAM,
     SIGNAL_STREAM,
 )
@@ -153,6 +154,27 @@ async def run_learner_stream(service: LearnerService, redis: Redis, stop_event: 
             reward = -0.05
         service.update_reward(playbook, reward)
 
+    async def handle_execution(payload: Mapping[str, object]) -> None:
+        # Reward shaping from execution telemetry (slippage, latency, risk/reward intent)
+        metadata = dict(payload.get("metadata", {}))
+        playbook = str(metadata.get("playbook", "TREND_PULLBACK"))
+        slippage_bps = payload.get("slippage_bps")
+        latency_ms = float(payload.get("latency_ms", 0.0))
+        rr = payload.get("risk_reward")
+        base = 0.05
+        penalty = 0.0
+        if isinstance(slippage_bps, (int, float)):
+            penalty += abs(float(slippage_bps)) * 0.0001  # 100 bps => 0.01 penalty
+        penalty += (latency_ms / 1000.0) * 0.001  # each second adds small penalty
+        bonus = 0.0
+        if isinstance(rr, (int, float)):
+            if rr >= 1.5:
+                bonus += 0.02
+            elif rr < 0.8:
+                bonus -= 0.02
+        reward = max(-0.1, min(0.1, base + bonus - penalty))
+        service.update_reward(playbook, reward)
+
     async def handle_signal(payload: Mapping[str, object]) -> None:
         signal = SignalIntent.from_dict(dict(payload))
         context = {
@@ -164,6 +186,7 @@ async def run_learner_stream(service: LearnerService, redis: Redis, stop_event: 
     tasks = [
         asyncio.create_task(consume_stream(redis, FEATURE_STREAM, handle_feature, stop=should_stop)),
         asyncio.create_task(consume_stream(redis, OMS_ORDER_STREAM, handle_order, stop=should_stop)),
+        asyncio.create_task(consume_stream(redis, EXECUTION_STREAM, handle_execution, stop=should_stop)),
         asyncio.create_task(consume_stream(redis, SIGNAL_STREAM, handle_signal, stop=should_stop)),
     ]
     try:

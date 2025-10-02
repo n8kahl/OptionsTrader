@@ -33,7 +33,21 @@ def choose_playbook(features: FeaturePacket, gate: GateResult) -> str:
 
 def build_signal(ts: int, underlying: str, features: FeaturePacket, gate: GateResult,
                  learner_adjustments: Mapping[str, float], atr: float) -> Mapping[str, object]:
+    # Regime-based pick, then bias by bandit weights within plausible set
     playbook = choose_playbook(features, gate)
+    weights = learner_adjustments.get("playbook_weights", {}) if isinstance(learner_adjustments, dict) else {}
+    if isinstance(weights, dict) and weights:
+        # Constrain to regime-consistent candidates
+        if gate.regime_score > 0.2:
+            candidates = ["TREND_PULLBACK", "LATE_PUSH"]
+        elif gate.regime_score < -0.2:
+            candidates = ["BALANCE_FADE", "ORB"]
+        else:
+            candidates = ["ORB", "LATE_PUSH"]
+        # Pick the highest-weight candidate
+        weighted_choice = max(candidates, key=lambda p: float(weights.get(p, 0.0)))
+        if weighted_choice != playbook:
+            playbook = weighted_choice
     context = RegimeContext(
         trend_score=gate.regime_score,
         vol_regime="stressed" if features.vol_of_vol > 0.1 else "moderate",
@@ -52,6 +66,11 @@ def build_signal(ts: int, underlying: str, features: FeaturePacket, gate: GateRe
         liquidity,
         atr,
     )
-    size_bump = learner_adjustments.get(playbook, 1.0)
+    # Use learner-provided playbook weights for sizing if available
+    weights = learner_adjustments.get("playbook_weights", {})
+    try:
+        size_bump = float(weights.get(playbook, 1.0)) if isinstance(weights, dict) else 1.0
+    except Exception:
+        size_bump = 1.0
     intent.size_multiplier *= size_bump
     return intent.to_dict()
